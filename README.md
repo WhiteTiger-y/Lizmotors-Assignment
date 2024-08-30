@@ -1,5 +1,3 @@
-### README.md for `lizmotors_assignment_sts_llm_with_interface.ipynb`
-
 # AI Assistant with Whisper, Bark, and Gradio
 
 This project implements an AI-powered voice assistant that utilizes Whisper for speech-to-text, an LLM for generating responses, and Bark for converting text responses back into speech. The interface is built using Gradio for easy interaction, making it accessible via a web interface.
