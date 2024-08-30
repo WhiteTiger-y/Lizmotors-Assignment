@@ -103,7 +103,7 @@ This simplified `mermaid` diagram should now render correctly.
 
 ---
 ## Video Guide 
-https://youtu.be/9dAwg-MJptE
+[link to guide and explaination video](https://youtu.be/9dAwg-MJptE)
 ---
 ## Dependencies
 
