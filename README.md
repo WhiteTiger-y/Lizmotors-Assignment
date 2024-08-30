@@ -58,7 +58,7 @@ Below is a conceptual flow diagram that describes the overall architecture and w
 graph TD
     A[User] -->|Upload Audio| B[Gradio Interface]
     B -->|Audio Input| C[Whisper Model]
-    C -->|Text Output| D[LLM (Flan-T5)]
+    C -->|Text Output| D[LLM Flan-T5]
     D -->|Generated Text| E[Bark TTS]
     E -->|Audio Output| B
 ```
