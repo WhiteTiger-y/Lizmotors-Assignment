@@ -102,7 +102,9 @@ This simplified `mermaid` diagram should now render correctly.
 3. **Accessing the Interface**: In Colab, you will receive a `gradio.live` link to access the web-based interface for interacting with the assistant.
 
 ---
-
+## Video Guide 
+https://youtu.be/9dAwg-MJptE
+---
 ## Dependencies
 
 Ensure you have the following dependencies installed in your environment. These can be installed using `pip`:
