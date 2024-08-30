@@ -63,6 +63,8 @@ graph TD
     E -->|Audio Output| B
 ```
 
+This simplified `mermaid` diagram should now render correctly.
+
 1. **User Interaction**: The user uploads or records audio in the Gradio interface.
 2. **Speech-to-Text Conversion**: Whisper processes the audio to convert it into text.
 3. **Text Generation**: The LLM processes the transcribed text and generates a response.
