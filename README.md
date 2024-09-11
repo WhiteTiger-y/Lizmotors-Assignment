@@ -1,122 +1,208 @@
-# AI Assistant with Whisper, Bark, and Gradio
+# Speech-to-Speech Language Model with Gradio Interface
 
-This project implements an AI-powered voice assistant that utilizes Whisper for speech-to-text, an LLM for generating responses, and Bark for converting text responses back into speech. The interface is built using Gradio for easy interaction, making it accessible via a web interface.
+## Overview
+This project demonstrates a pipeline that integrates **Whisper** for speech-to-text (STT), **Google Flan-T5** for natural language generation (NLG), and **Bark** for text-to-speech (TTS), all combined into a simple **Gradio** interface. The user can record their voice, transcribe the audio, generate a response from an AI model, and convert the AI-generated response back to speech, making it a full speech-to-speech system.
+
+![Workflow Diagram](https://example.com/path_to_diagram.png)  
+*(Replace with actual diagram URL once available)*
+
+## Key Libraries Used
+- `transformers`: For loading pre-trained models like Google Flan-T5 for text generation.
+- `whisper`: For accurate speech-to-text transcription.
+- `bark`: For text-to-speech generation.
+- `gradio`: To create an easy-to-use web interface.
+- `librosa`: For audio pre-processing and conversion.
+- `soundfile`: For writing audio data to files.
 
 ---
 
-## Project Overview
+## Installation
 
-The voice assistant follows a structured workflow:
-1. **Audio Input**: Users record or upload an audio file.
-2. **Speech-to-Text Conversion**: Whisper processes the audio and converts it to text.
-3. **Text Generation**: The transcribed text is passed to a Large Language Model (LLM), which generates a conversational response.
-4. **Text-to-Speech Conversion**: Bark converts the generated text response into audio, allowing users to hear the AI's response.
-5. **Interactive Interface**: The entire process is handled through an intuitive Gradio interface where users can select speakers, upload audio, and listen to responses.
+To run this project, the following dependencies are required:
+
+```bash
+!pip install -q transformers==4.37.2
+!pip install -q bitsandbytes==0.41.3 accelerate==0.25.0
+!pip install -q git+https://github.com/openai/whisper.git
+!pip install -q gradio
+!pip install -q gTTS
+!pip install -q huggingface_hub
+!pip install -q bark
+```
 
 ---
 
-## Workflow Architecture
+## Workflow
 
-### 1. **Speech-to-Text (Whisper)**
-   - **Whisper Model**: We utilize the `whisper` library from OpenAI, specifically the "medium" model, for speech recognition.
-   - **Functionality**: The `transcribe()` function handles the conversion of audio to text by processing audio files through Whisper's pre-trained model.
-   - **Implementation**:
-     - Audio files are loaded and preprocessed using `librosa`.
-     - The Whisper model transcribes the audio by converting it into a mel spectrogram and decoding it into text.
+1. **Input Audio**: The user records their voice or uploads an audio file using the `Gradio` interface.
+2. **Whisper Model**: This recorded audio is then passed to **Whisper** for transcription, which converts the speech into text.
+3. **Flan-T5 Model**: The transcribed text is used as input for the **Flan-T5 XL** model, which generates a text-based response.
+4. **Bark Model**: The generated text is converted back to speech using the **Bark** TTS model with a selectable speaker option (English male/female voices).
+5. **Output Audio**: The AI-generated speech response is played back, and both the text and audio outputs are displayed.
 
-### 2. **Text Generation (LLM)**
-   - **Model Used**: We leverage `google/flan-t5-xl`, a pre-trained language model for text generation.
-   - **Quantization**: To optimize performance, the model is loaded with 4-bit quantization via `BitsAndBytesConfig`.
-   - **Functionality**: The `pipe` object handles the text generation process, where the transcribed text is fed into the model and a conversational response is generated.
-   - **Instruction to LLM**: The assistant is instructed to answer user queries in an accurate and concise manner, with detailed explanations where necessary.
+---
 
-### 3. **Text-to-Speech (Bark)**
-   - **Bark Model**: Suno’s Bark is used for high-quality text-to-speech synthesis.
-   - **Speaker Selection**: Users can choose from different pre-configured voices (e.g., `english-male-1`, `english-male-2`, `english-female`).
-   - **Functionality**: The `text_to_speech_bark()` function converts the LLM-generated response into an audio file using the Bark model’s `generate_audio()` function.
-   - **Audio Output**: The generated audio is saved as a `.wav` file and played back to the user.
+## Detailed Code Flow
 
-### 4. **Gradio Interface**
-   - **User Interface**: Gradio provides an interactive web-based interface that allows users to:
-     1. Upload or record audio.
-     2. Select a speaker for TTS.
-     3. Process the audio to receive a text response.
-     4. Listen to the AI-generated audio response.
-   - **Buttons**:
-     - `Process Audio`: Executes the full pipeline from STS to TTS.
-     - `Clear`: Resets the inputs and outputs to allow for a new interaction.
+### 1. **CUDA Check**
+
+```python
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f"Using torch {torch.__version__} ({DEVICE})")
+```
+Checks if CUDA is available for faster model inference using the GPU.
+
+### 2. **Loading Whisper Model (STT)**
+
+```python
+whisper_model = whisper.load_model("medium", device=DEVICE)
+```
+The Whisper model is loaded to transcribe speech to text. The `medium` variant is selected for balance between speed and accuracy.
+
+### 3. **Loading Flan-T5 XL Model (NLG)**
+
+```python
+model_id = "google/flan-t5-xl"
+quant_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+pipe = pipeline("text2text-generation", model=model_id, model_kwargs={"quantization_config": quant_config})
+```
+This loads the **Google Flan-T5 XL** model with 4-bit quantization to optimize memory usage and improve performance.
+
+### 4. **Loading Bark Model (TTS)**
+
+```python
+processor = AutoProcessor.from_pretrained("suno/bark")
+bark_model = AutoModel.from_pretrained("suno/bark")
+```
+The **Bark** model is initialized to convert text into speech, using the `AutoProcessor` and `AutoModel` from Hugging Face's **Bark** repository.
+
+### 5. **Audio Pre-processing Function**
+
+```python
+def convert_audio_to_whisper_format(audio_path):
+    audio, sr = librosa.load(audio_path, sr=16000, mono=True)
+    sf.write(processed_audio_path, audio, sr)
+    return processed_audio_path
+```
+This function converts the input audio to 16kHz mono format, which is required by Whisper for accurate transcription.
+
+### 6. **Transcription (Speech-to-Text)**
+
+```python
+def transcribe(audio):
+    audio = whisper.load_audio(audio)
+    mel = whisper.log_mel_spectrogram(audio).to(whisper_model.device)
+    result = whisper.decode(whisper_model, mel)
+    return result.text
+```
+The audio is passed to **Whisper** to get a text transcription. The model creates a log-mel spectrogram for speech recognition.
+
+### 7. **Text-to-Speech using Bark**
+
+```python
+def text_to_speech_bark(text, speaker_id, file_path="output.wav"):
+    audio_array = generate_audio(text, history_prompt=speaker_id)
+    sf.write(file_path, audio_array, 24000)
+    return file_path
+```
+Once the text is generated, it is passed to the **Bark** model, which synthesizes speech in the specified speaker's voice.
+
+### 8. **End-to-End Audio Processing Function**
+
+```python
+def process_audio(audio_path, speaker):
+    speech_to_text_output = transcribe(audio_path)
+    llm_input = f"{llm_instruction}\nUser: {speech_to_text_output}"
+    llm_response = pipe(llm_input)[0]['generated_text']
+    processed_audio_path = text_to_speech_bark(llm_response, SPEAKERS[speaker])
+    return speech_to_text_output, llm_response, processed_audio_path
+```
+This function ties everything together:
+- Transcribes audio.
+- Generates a response using **Flan-T5**.
+- Converts the response back into speech using **Bark**.
+
+### 9. **Gradio Interface**
+
+```python
+with gr.Blocks() as demo:
+    audio_input = gr.Audio(type="filepath", label="Record your voice")
+    speaker_dropdown = gr.Dropdown(choices=list(SPEAKERS.keys()), label="Select Speaker", value="english-male-1")
+    transcript_output = gr.Textbox(label="Speech to Text")
+    llm_output = gr.Textbox(label="LLM Response")
+    audio_output = gr.Audio(label="Response as Audio")
+
+    process_btn = gr.Button("Process Audio")
+    clear_btn = gr.Button("Clear")
+
+    process_btn.click(process_audio, inputs=[audio_input, speaker_dropdown], outputs=[transcript_output, llm_output, audio_output])
+    clear_btn.click(clear_inputs, outputs=[audio_input, transcript_output, llm_output, audio_output])
+```
+A simple **Gradio** interface where the user can upload audio, select a speaker, and get the response text and audio.
+
+---
+
+## File Structure
+
+```
+.
+├── README.md           <- You are here
+├── main.py             <- Main code file
+├── requirements.txt    <- Required Python libraries
+├── output.wav          <- Sample output file
+└── data/               <- Directory for audio files
+```
+
+---
+
+## Usage
+
+1. Clone this repository.
+2. Install dependencies listed in `requirements.txt`.
+3. Run the `main.py` file to start the **Gradio** interface.
+4. Interact with the application by recording/uploading your voice, and choosing the desired speaker for output.
 
 ---
 
 ## Flow Diagram
 
-Below is a conceptual flow diagram that describes the overall architecture and workflow of the voice assistant.
-
 ```mermaid
-graph TD
-    A[User] -->|Upload Audio| B[Gradio Interface]
-    B -->|Audio Input| C[Whisper Model]
-    C -->|Text Output| D[LLM Flan-T5]
-    D -->|Generated Text| E[Bark TTS]
-    E -->|Audio Output| B
+graph TD;
+    A[Audio Input] --> B[Whisper Model (STT)];
+    B --> C[Google Flan-T5 (LLM)];
+    C --> D[Bark Model (TTS)];
+    D --> E[Audio Output];
+    A -->|Converted Audio| B;
+    B -->|Transcribed Text| C;
+    C -->|Generated Text| D;
+    D -->|Synthesized Speech| E;
 ```
 
-This simplified `mermaid` diagram should now render correctly.
-
-1. **User Interaction**: The user uploads or records audio in the Gradio interface.
-2. **Speech-to-Text Conversion**: Whisper processes the audio to convert it into text.
-3. **Text Generation**: The LLM processes the transcribed text and generates a response.
-4. **Text-to-Speech Conversion**: Bark converts the LLM-generated text to audio using a selected speaker.
-5. **Output**: The processed audio response is played back to the user.
-
 ---
 
-## Code Breakdown
+## Future Additions
 
-### 1. **Setup and Installation**
-   - The necessary Python packages are installed using `pip`. This includes `transformers`, `whisper`, `gradio`, `bark`, and others.
+1. **Voice Activity Detection (VAD)**:
+   - Implement a voice activation feature similar to "Hey Google" or "Alexa" that triggers the system when a specific phrase is detected. This will allow the model to be in a listening state, only processing speech after hearing the wake word.
+   - Integrate with libraries like `webrtcvad` or use pre-trained VAD models to detect when the user begins speaking, improving efficiency by reducing unnecessary audio processing.
 
-### 2. **Model Loading**
-   - **Whisper Model**: Loaded using `whisper.load_model("medium")`.
-   - **Text Generation Model**: Loaded using Hugging Face’s `pipeline` with 4-bit quantization for efficiency.
-   - **Bark Model**: Loaded via `AutoProcessor` and `AutoModel` for text-to-speech synthesis.
+2. **Smarter Prompts for LLM**:
+   - Introduce dynamic context-sensitive prompts for the language model (LLM), allowing it to better understand the nuances of the conversation.
+   - For example, if the system detects a question, it will automatically add clarifying instructions, and for complex queries, it will request further context from the user.
+   - Utilize reinforcement learning to make the system adaptive to different user inputs, improving response relevance over time.
 
-### 3. **Core Functions**
-   - **convert_audio_to_whisper_format()**: Converts audio to the format required by Whisper.
-   - **transcribe()**: Handles speech-to-text conversion.
-   - **text_to_speech_bark()**: Converts text to speech using the selected Bark speaker.
-   - **process_audio()**: Orchestrates the entire pipeline (STS → LLM → TTS).
+3. **Memory Functionality**:
+   - Add memory to the system so it can remember previous parts of the conversation during the same session. This will make the system capable of following context and understanding recurring themes or references.
+   - The memory functionality will allow the model to track and reference previous inputs and responses, much like a chat history in conversational AI.
+   - Store key conversation elements (e.g., user preferences or important data points) in session-level memory for more meaningful interactions.
+   
+4. **Enhanced Personalization**:
+   - Offer more speaker and tone customization options, allowing users to choose different accents, speaking styles, or even emotional tones based on their preferences.
+   - Integrate multi-lingual support for seamless transitions between languages within a single conversation.
 
-### 4. **Gradio Interface**
-   - **Blocks API**: Gradio’s `Blocks` API is used to define the layout and interaction logic of the interface.
-   - **Components**: The interface includes an audio uploader, a dropdown for speaker selection, textboxes for displaying results, and buttons for processing or clearing inputs.
+5. **Longer Audio Context**:
+   - Allow the system to handle longer audio inputs or monologues, enabling it to generate comprehensive responses for more detailed discussions or multi-turn conversations.
+   - Include the ability to summarize long transcriptions and generate concise responses for ease of use.
 
----
 
-## Running the Notebook
 
-1. **Environment Setup**: The notebook is designed to run on Google Colab with an A100 GPU for optimal performance.
-2. **Execution**: Run all cells sequentially to set up the environment, load models, and launch the Gradio interface.
-3. **Accessing the Interface**: In Colab, you will receive a `gradio.live` link to access the web-based interface for interacting with the assistant.
-
----
-## Video Guide 
-[Link to guide and explaination video](https://youtu.be/9dAwg-MJptE)
----
-## Dependencies
-
-Ensure you have the following dependencies installed in your environment. These can be installed using `pip`:
-
-```bash
-transformers==4.37.2
-bitsandbytes==0.41.3
-accelerate==0.25.0
-whisper
-gradio
-gTTS
-huggingface_hub
-bark
-librosa
-soundfile
-```
-This README provides detailed information about the architecture, workflow, and usage of the AI-powered voice assistant implemented in the `lizmotors_assignment_sts_llm_with_interface.ipynb` notebook.
