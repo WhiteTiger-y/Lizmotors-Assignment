@@ -3,8 +3,6 @@
 ## Overview
 This project demonstrates a pipeline that integrates **Whisper** for speech-to-text (STT), **Google Flan-T5** for natural language generation (NLG), and **Bark** for text-to-speech (TTS), all combined into a simple **Gradio** interface. The user can record their voice, transcribe the audio, generate a response from an AI model, and convert the AI-generated response back to speech, making it a full speech-to-speech system.
 
-![Workflow Diagram](https://example.com/path_to_diagram.png)  
-*(Replace with actual diagram URL once available)*
 
 ## Key Libraries Used
 - `transformers`: For loading pre-trained models like Google Flan-T5 for text generation.
