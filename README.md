@@ -168,14 +168,15 @@ A simple **Gradio** interface where the user can upload audio, select a speaker,
 
 ```mermaid
 graph TD;
-    A[Audio Input] --> B[Whisper Model (STT)];
-    B --> C[Google Flan-T5 (LLM)];
-    C --> D[Bark Model (TTS)];
+    A[Audio Input] --> B[Whisper Model - STT];
+    B --> C[Google Flan-T5 - LLM];
+    C --> D[Bark Model  TTS];
     D --> E[Audio Output];
     A -->|Converted Audio| B;
     B -->|Transcribed Text| C;
     C -->|Generated Text| D;
     D -->|Synthesized Speech| E;
+
 ```
 
 ---
